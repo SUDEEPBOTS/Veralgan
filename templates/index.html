@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>String Session Generator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body { background: #050505; color: white; font-family: 'Inter', sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .card { background: #111; padding: 30px; border-radius: 12px; border: 1px solid #333; width: 100%; max-width: 400px; text-align: center; }
+        input { width: 90%; padding: 12px; margin: 10px 0; background: #222; border: 1px solid #444; color: white; border-radius: 6px; }
+        button { width: 100%; padding: 12px; background: #0070f3; border: none; color: white; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 10px; }
+        button:hover { background: #0056b3; }
+        .hidden { display: none; }
+        .error { color: #ff4444; margin-top: 10px; font-size: 14px; }
+        .success-box { background: #111; border: 1px solid #238636; padding: 10px; margin-top: 10px; word-break: break-all; font-family: monospace; font-size: 12px; color: #7ee787; }
+    </style>
+</head>
+<body>
+
+<div class="card" id="login-step">
+    <h2>Pyrogram String Gen</h2>
+    <input type="text" id="api_id" placeholder="API ID" value="33917975">
+    <input type="text" id="api_hash" placeholder="API HASH" value="9ded8160307386acef2451d464e7a9b9">
+    <input type="text" id="phone" placeholder="Phone Number (+91...)" required>
+    <button onclick="sendOtp()">Send OTP 🚀</button>
+    <div id="error-msg" class="error"></div>
+</div>
+
+<div class="card hidden" id="otp-step">
+    <h2>Enter OTP</h2>
+    <p style="color:#888; font-size:13px;">Check your Telegram App</p>
+    <input type="text" id="otp" placeholder="1 2 3 4 5">
+    <button onclick="verifyOtp()">Verify OTP ✅</button>
+    <div id="otp-error" class="error"></div>
+</div>
+
+<div class="card hidden" id="2fa-step">
+    <h2>Two-Step Verification</h2>
+    <p style="color:#888; font-size:13px;">Enter your Cloud Password</p>
+    <input type="password" id="password" placeholder="Password">
+    <button onclick="verify2FA()">Submit Password 🔐</button>
+    <div id="2fa-error" class="error"></div>
+</div>
+
+<div class="card hidden" id="success-step">
+    <h2>🎉 Success!</h2>
+    <p>Tap to Copy your String Session</p>
+    <div class="success-box" id="string-result" onclick="copyString()"></div>
+    <p style="color:#888; font-size:12px; margin-top:10px;">Copied? Now close this tab.</p>
+</div>
+
+<script>
+    let phoneCodeHash = "";
+    
+    async function sendOtp() {
+        const btn = document.querySelector('button');
+        btn.innerText = "Sending...";
+        
+        const res = await fetch('/send_otp', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                api_id: document.getElementById('api_id').value,
+                api_hash: document.getElementById('api_hash').value,
+                phone: document.getElementById('phone').value
+            })
+        });
+        const data = await res.json();
+        
+        if(data.status === "success") {
+            phoneCodeHash = data.phone_code_hash;
+            document.getElementById('login-step').classList.add('hidden');
+            document.getElementById('otp-step').classList.remove('hidden');
+        } else {
+            document.getElementById('error-msg').innerText = data.message;
+            btn.innerText = "Send OTP 🚀";
+        }
+    }
+
+    async function verifyOtp() {
+        const res = await fetch('/verify_otp', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                phone: document.getElementById('phone').value,
+                code: document.getElementById('otp').value,
+                phone_code_hash: phoneCodeHash
+            })
+        });
+        const data = await res.json();
+
+        if(data.status === "success") {
+            showSuccess(data.string_session);
+        } else if (data.status === "2fa_required") {
+            document.getElementById('otp-step').classList.add('hidden');
+            document.getElementById('2fa-step').classList.remove('hidden');
+        } else {
+            document.getElementById('otp-error').innerText = data.message;
+        }
+    }
+
+    async function verify2FA() {
+        const res = await fetch('/verify_2fa', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                phone: document.getElementById('phone').value,
+                password: document.getElementById('password').value
+            })
+        });
+        const data = await res.json();
+        
+        if(data.status === "success") {
+            showSuccess(data.string_session);
+        } else {
+            document.getElementById('2fa-error').innerText = data.message;
+        }
+    }
+
+    function showSuccess(string) {
+        document.getElementById('otp-step').classList.add('hidden');
+        document.getElementById('2fa-step').classList.add('hidden');
+        document.getElementById('success-step').classList.remove('hidden');
+        document.getElementById('string-result').innerText = string;
+    }
+
+    function copyString() {
+        const text = document.getElementById('string-result').innerText;
+        navigator.clipboard.writeText(text);
+        alert("String Copied! Go back to Env Generator.");
+    }
+</script>
+
+</body>
+</html>
